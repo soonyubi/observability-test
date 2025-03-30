@@ -1,27 +1,34 @@
 // tracing.ts
-import { NodeSDK } from '@opentelemetry/sdk-node';
+import { logs as logsAPI } from '@opentelemetry/api-logs';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-
-const metricReader = new PeriodicExportingMetricReader({
-  exporter: new OTLPMetricExporter({ url: 'http://localhost:4318/v1/metrics' }),
-  exportIntervalMillis: 1000, // 원하는 주기(ms)
-});
-
-const sdk = new NodeSDK({
-  traceExporter: new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces',
-  }),
-  metricReader: metricReader,
-  instrumentations: [getNodeAutoInstrumentations()],
-});
+import {
+  BatchLogRecordProcessor,
+  LoggerProvider,
+} from '@opentelemetry/sdk-logs';
+import { NodeSDK } from '@opentelemetry/sdk-node';
 
 export function startTelemetry() {
-  sdk.start();
-}
+  const traceExporter = new OTLPTraceExporter({
+    url: 'http://otel-collector:4318/v1/traces',
+  });
 
-export function shutdownTelemetry() {
-  return sdk.shutdown();
+  const logExporter = new OTLPLogExporter({
+    url: 'http://otel-collector:4318/v1/logs',
+  });
+
+  const loggerProvider = new LoggerProvider();
+  loggerProvider.addLogRecordProcessor(
+    new BatchLogRecordProcessor(logExporter),
+  );
+  logsAPI.setGlobalLoggerProvider(loggerProvider);
+
+  const sdk = new NodeSDK({
+    traceExporter,
+    instrumentations: [getNodeAutoInstrumentations()],
+  });
+
+  sdk.start();
+  console.log('✅ OpenTelemetry started');
 }

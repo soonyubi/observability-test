@@ -1,23 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { startTelemetry, shutdownTelemetry } from './tracing';
+import { startTelemetry } from './tracing';
+import { logger } from './logger/winston.logger';
 
 async function bootstrap() {
   startTelemetry();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger,
+  });
   await app.listen(3000);
-
-  process.on('SIGINT', async () => {
-    console.log('🛑 SIGINT received. Shutting down...');
-    await app.close();
-    await shutdownTelemetry();
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    await shutdownTelemetry();
-    process.exit(0);
-  });
 }
 bootstrap();
