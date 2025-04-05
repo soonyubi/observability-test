@@ -9,4 +9,17 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('error')
+  getError(): string {
+    throw new Error('This is a test error');
+  }
+
+  @Get('slow')
+  getSlow(): string {
+    for (let i = 0; i < 1000000000; i++) {
+      Math.sqrt(i);
+    }
+    return 'Done';
+  }
 }

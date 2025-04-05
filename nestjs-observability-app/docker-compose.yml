@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    depends_on:
+      - otel-collector
+      - tempo
+      - loki
+    networks:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - '4318:4318' # OTLP HTTP 수신 포트
+      - '8888:8888' # Collector metrics (선택)
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:2.9.3
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.3.1
+    ports:
+      - '3200:3200'
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml # Tempo query port
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - '4000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  grafana-storage:
