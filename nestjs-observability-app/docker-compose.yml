@@ -13,6 +13,7 @@ services:
       - tempo
       - loki
       - postgres
+      - prometheus
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mydb?schema=public
       - NODE_ENV=production
@@ -72,6 +73,33 @@ services:
     networks:
       - observability
 
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - observability
+
+  mimir:
+    image: grafana/mimir:2.10.1
+    command: ['-config.file=/etc/mimir/config.yaml']
+    ports:
+      - '9009:9009' # API 및 UI
+      - '9091:9090' # Prometheus API (포트 충돌 방지를 위해 9091로 변경)
+    volumes:
+      - ./mimir-config.yaml:/etc/mimir/config.yaml
+      - mimir-data:/data
+    networks:
+      - observability
+
 networks:
   observability:
     driver: bridge
@@ -79,3 +107,5 @@ networks:
 volumes:
   grafana-storage:
   postgres-data:
+  mimir-data:
+  prometheus-data:
