@@ -1,27 +1,35 @@
 import * as winston from 'winston';
 import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
-import { trace } from '@opentelemetry/api';
-
-// 로그 메시지를 JSON 형식으로 변환하는 포맷터
-const jsonFormat = winston.format.combine(
-  winston.format.timestamp(),
-  winston.format.json(),
-  winston.format.printf((info) => {
-    const span = trace.getActiveSpan();
-    if (span) {
-      const spanContext = span.spanContext();
-      info.traceId = spanContext.traceId;
-      info.spanId = spanContext.spanId;
-    }
-    return JSON.stringify(info);
-  }),
-);
+import { Injectable, LoggerService } from '@nestjs/common';
 
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL ?? 'info',
-  format: jsonFormat,
+  level: process.env.LOG_LEVEL ?? 'debug',
+  format: winston.format.json(),
   transports: [
     new winston.transports.Console(),
     new OpenTelemetryTransportV3(),
   ],
 });
+
+@Injectable()
+export class MyLogger implements LoggerService {
+  log(message: any, context?: string) {
+    logger.info(message, { context });
+  }
+  error(message: any, stack?: string, context?: string) {
+    if (message instanceof Error) {
+      stack = message.stack;
+      message = message.message;
+    }
+    logger.error(message, { context, stack });
+  }
+  warn(message: any, context?: string) {
+    logger.warn(message, { context });
+  }
+  debug?(message: any, context?: string) {
+    logger.debug(message, { context });
+  }
+  verbose?(message: any, context?: string) {
+    logger.verbose(message, { context });
+  }
+}

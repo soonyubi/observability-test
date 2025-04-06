@@ -16,12 +16,12 @@ import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import {
   ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
   SemanticResourceAttributes,
   SEMRESATTRS_SERVICE_NAME,
 } from '@opentelemetry/semantic-conventions';
 import * as os from 'os';
 import { resourceFromAttributes } from '@opentelemetry/resources';
+import { PrismaInstrumentation } from '@prisma/instrumentation';
 
 export function startTelemetry() {
   const traceExporter = new OTLPTraceExporter({
@@ -35,10 +35,12 @@ export function startTelemetry() {
   const loggerProvider = new LoggerProvider({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: 'nestjs-app',
-      [ATTR_SERVICE_VERSION]: '1.0.0',
+      [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: 'dev',
+      [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
       app: 'nestjs',
       project: 'nestjs-observability-app',
       team: 'soonyubing',
+      [SemanticResourceAttributes.HOST_NAME]: os.hostname(),
     }),
   });
   loggerProvider.addLogRecordProcessor(
@@ -70,6 +72,7 @@ export function startTelemetry() {
       new ExpressInstrumentation(),
       new NestInstrumentation(),
       new WinstonInstrumentation(),
+      new PrismaInstrumentation(),
     ],
   });
 

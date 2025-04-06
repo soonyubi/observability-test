@@ -5,12 +5,30 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     ports:
       - '3000:3000'
     depends_on:
       - otel-collector
       - tempo
       - loki
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mydb?schema=public
+      - NODE_ENV=production
+    networks:
+      - observability
+
+  postgres:
+    image: postgres:15
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mydb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - observability
 
@@ -60,3 +78,4 @@ networks:
 
 volumes:
   grafana-storage:
+  postgres-data:
