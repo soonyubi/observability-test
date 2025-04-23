@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - '3000:3000'
+    depends_on:
+      - otel-collector
+      - tempo
+      - loki
+      - postgres
+      - prometheus
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mydb?schema=public
+      - NODE_ENV=production
+    networks:
+      - observability
+
+  postgres:
+    image: postgres:15
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mydb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - '4318:4318' # OTLP HTTP 수신 포트
+      - '8888:8888' # Collector metrics (선택)
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:2.9.3
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.3.1
+    ports:
+      - '3200:3200'
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml # Tempo query port
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - '4000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - observability
+
+  mimir:
+    image: grafana/mimir:2.10.1
+    command: ['-config.file=/etc/mimir/config.yaml']
+    ports:
+      - '9009:9009' # API 및 UI
+      - '9091:9090' # Prometheus API (포트 충돌 방지를 위해 9091로 변경)
+    volumes:
+      - ./mimir-config.yaml:/etc/mimir/config.yaml
+      - mimir-data:/data
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge
+
+volumes:
+  grafana-storage:
+  postgres-data:
+  mimir-data:
+  prometheus-data:

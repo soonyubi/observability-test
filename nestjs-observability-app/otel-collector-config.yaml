@@ -1,0 +1,64 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlphttp/tempo:
+    endpoint: http://tempo:4318
+
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: false
+      job: true
+
+  debug:
+    verbosity: detailed
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  attributes:
+    actions:
+      - action: insert
+        key: loki.attribute.labels
+        value: host.name
+      - action: insert
+        key: loki.attribute.labels
+        value: container.id
+      - action: insert
+        key: service_name
+        from_attribute: service.name
+      - action: insert
+        key: loki.resource.labels
+        value: service_name
+
+  resource:
+    attributes:
+      - action: insert
+        key: service.name
+        value: nestjs-app
+      - action: insert
+        key: host.name
+        value: my-local-host
+      - action: insert
+        key: loki.resource.labels
+        value: service.name, host.name
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, attributes, resource]
+      exporters: [loki]
